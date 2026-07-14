@@ -151,3 +151,26 @@ design doc §4).
   −9.84 → −7.17 → −4.29; KL 0.33 → 0.24 → 0.75 nats with 5/16 dimensions
   ≥ 0.1 — the encoder carries information; no early collapse. (The epoch-2
   KL dip then rise is the familiar compress-then-use trajectory.)
+
+---
+
+## 2026-07-14 — CVAE Milestone 3: conditioning both networks (Phase 6.3)
+
+- **Context embedding concatenated into BOTH encoder and decoder inputs**
+  (Sohn et al. 2015). The design doc's checklist item — conditioning only
+  the decoder is the documented error — is enforced structurally: neither
+  network has a context-free path, and two unit tests pin that the posterior
+  mean and the decoder output each respond to a context change.
+- **Conditioning verified two ways:** (i) unit test — on synthetic data
+  where context IS the signal, zeroing the context embedding after 10
+  training steps degrades the ELBO; (ii) real-data inline ablation — a
+  fresh model trained 1 epoch with zeroed context ends at ELBO −9.64 vs
+  −9.15 with real context.
+- **Predicted pathology observed, on schedule:** with context active, total
+  KL falls to ~0.09 nats (0/16 dims ≥ 0.1) vs 0.75 nats for the
+  unconditional VAE — the informative context (lags above all) explains most
+  of the window, so the ELBO pushes the posterior toward the prior. This is
+  the early-collapse pressure the design doc rates "likelihood: high" and is
+  precisely what Milestone 5's KL annealing + free bits are for. Not fixed
+  here by design; the per-dimension monitor caught it, which is the point.
+- Smoke run: ELBO −9.15 → −6.22 → −3.05 over 3 epochs (73,804 params).
