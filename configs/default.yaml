@@ -1,0 +1,53 @@
+# Default experiment configuration.
+#
+# Encodes the binding design decisions frozen in
+# docs/project-design-document.md, Section 10. Values marked PLACEHOLDER are
+# deferred to the phase noted next to them and must be pinned before results
+# are reported.
+
+data:
+  dataset: m5-forecasting-accuracy
+  category: FOODS                 # single-category scope (design doc §4)
+  aggregation: weekly             # daily -> weekly per item-store (assumption A2)
+  horizon_weeks: 4                # H = 4: length of the demand window x (design doc §1.3)
+  n_lags: 4                       # L: lagged weeks of recent demand in context y (default; tuned Week 2)
+  split:
+    # Temporal split; never random (roadmap Phase 4). M5 evaluation data
+    # covers 277 complete Walmart weeks (Sat-Fri): 2011-01-29 .. 2016-05-20.
+    # A week belongs to a split iff its full 7 days end on or before the
+    # boundary; a window belongs to a split iff all its L lag weeks and H
+    # target weeks lie inside it (boundary-straddling windows dropped).
+    # Train = weeks 1-182 (~3.5y), val = 183-221 (~0.75y), test = 222-277 (~1y).
+    train_end: "2014-07-25"
+    val_end: "2015-04-24"
+
+model:
+  latent_dim: 16                  # K (design range 8-16; sweep is a Phase 9 ablation)
+  encoder_hidden: [128, 64]       # MLP widths (MLPs are sufficient at H <= 8, roadmap Phase 6)
+  decoder_hidden: [64, 128]
+  item_embedding_dim: 32          # learned embeddings for the categorical context
+  store_embedding_dim: 4
+  decoder: negative_binomial      # primary decoder likelihood; 'gaussian' retained as ablation
+  prior: standard_normal          # N(0, I); learned priors are out of scope
+  kl_annealing: true              # collapse handling available from run one (design doc §8)
+  free_bits: 0.0                  # per-dimension KL floor; 0 disables
+
+training:
+  seeds: [0, 1, 2]                # final numbers reported as mean +/- sd over 3 seeds
+  lr: 1.0e-3                      # PLACEHOLDER (Phase 7): Adam default, not yet tuned
+  batch_size: 256                 # PLACEHOLDER (Phase 7)
+  max_epochs: 200                 # PLACEHOLDER (Phase 7): early stopping on validation ELBO
+
+decision:
+  protocol: aggregate_horizon     # primary decision task: D = sum of the H-week window (design doc §1.2)
+  n_scenarios: 1000               # S: scenario draws per decision (SAA)
+  cost_ratios:                    # [c_u, c_o]; all three pre-registered, all reported (design doc §7)
+    - [3, 1]
+    - [1, 1]
+    - [1, 3]
+
+paths:
+  data_dir: data
+  results_dir: results
+  figures_dir: figures
+  checkpoints_dir: checkpoints

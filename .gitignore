@@ -1,0 +1,49 @@
+# --- Data: never committed (see data/README.md for how to download M5) ---
+data/*
+!data/README.md
+
+# --- Model artifacts / experiment tracking ---
+*.ckpt
+*.pt
+*.pth
+checkpoints/
+wandb/
+mlruns/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+.venv/
+venv/
+env/
+.python-version
+
+# --- Tooling caches ---
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+.coverage
+htmlcov/
+
+# --- LaTeX build artifacts (reports/) ---
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
