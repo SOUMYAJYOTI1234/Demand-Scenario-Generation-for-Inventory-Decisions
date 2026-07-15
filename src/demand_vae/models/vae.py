@@ -79,6 +79,34 @@ def vae_loss(
     }
 
 
+def nb_vae_loss(
+    mu: torch.Tensor,
+    r: torch.Tensor,
+    x: torch.Tensor,
+    mu_z: torch.Tensor,
+    log_sigma_sq: torch.Tensor,
+    beta: float = 1.0,
+) -> dict[str, torch.Tensor]:
+    """ELBO-derived loss with the Negative Binomial reconstruction term.
+
+    Same structure and conventions as :func:`vae_loss` — reconstruction NLL
+    summed over the H weeks, KL summed over latent dims, both batch-averaged,
+    loss = recon + beta * KL — but the observation model is the per-week NB
+    on **raw counts** (Milestone 4), so this ELBO is an exact (not
+    constant-dropped) bound on the discrete log-likelihood.
+    """
+    from demand_vae.models.distributions import nb_log_likelihood
+
+    recon = -nb_log_likelihood(x, mu, r).sum(dim=-1).mean()
+    kl = gaussian_kl(mu_z, log_sigma_sq)
+    return {
+        "loss": recon + beta * kl,
+        "recon": recon,
+        "kl": kl,
+        "elbo": -(recon + kl),
+    }
+
+
 class UnconditionalVAE(nn.Module):
     """VAE over demand windows: q(z|x) diagonal Gaussian, p(x|z) Gaussian in log1p space."""
 

@@ -3,16 +3,20 @@
 from demand_vae.models.autoencoder import ContextEncoder, DemandAutoencoder, reconstruction_loss
 from demand_vae.models.base import BaseSampler
 from demand_vae.models.cvae import ConditionalVAE
+from demand_vae.models.distributions import MU_FLOOR, R_FLOOR, nb_log_likelihood
 from demand_vae.models.trivial import ConstantSampler, FixedRatePoissonSampler
 from demand_vae.models.vae import (
     UnconditionalVAE,
     gaussian_kl,
     gaussian_kl_per_dim,
+    nb_vae_loss,
     reparameterize,
     vae_loss,
 )
 
 __all__ = [
+    "MU_FLOOR",
+    "R_FLOOR",
     "BaseSampler",
     "ConditionalVAE",
     "ConstantSampler",
@@ -22,6 +26,8 @@ __all__ = [
     "UnconditionalVAE",
     "gaussian_kl",
     "gaussian_kl_per_dim",
+    "nb_log_likelihood",
+    "nb_vae_loss",
     "reconstruction_loss",
     "reparameterize",
     "vae_loss",

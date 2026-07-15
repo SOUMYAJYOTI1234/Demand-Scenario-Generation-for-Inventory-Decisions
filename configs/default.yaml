@@ -27,7 +27,7 @@ model:
   decoder_hidden: [64, 128]
   item_embedding_dim: 32          # learned embeddings for the categorical context
   store_embedding_dim: 4
-  decoder: negative_binomial      # primary decoder likelihood; 'gaussian' retained as ablation
+  decoder_likelihood: nb          # primary decoder likelihood ('nb'); 'gaussian' retained as RQ1 ablation
   prior: standard_normal          # N(0, I); learned priors are out of scope
   kl_annealing: true              # collapse handling available from run one (design doc §8)
   free_bits: 0.0                  # per-dimension KL floor; 0 disables

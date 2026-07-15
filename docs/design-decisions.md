@@ -174,3 +174,30 @@ design doc §4).
   precisely what Milestone 5's KL annealing + free bits are for. Not fixed
   here by design; the per-dimension monitor caught it, which is the point.
 - Smoke run: ELBO −9.15 → −6.22 → −3.05 over 3 epochs (73,804 params).
+
+---
+
+## 2026-07-15 — CVAE Milestone 4: Negative Binomial decoder (Phase 6.4)
+
+- **Config switch `model.decoder_likelihood: nb | gaussian`** (replaces the
+  scaffold-era `decoder:` key). Both decoders live in one `ConditionalVAE`:
+  a shared MLP trunk feeds either two NB heads or one Gaussian head, so the
+  RQ1 ablation swaps a config value, nothing else.
+- **NB parameterization** (mean μ, dispersion r; Var = μ + μ²/r): heads pass
+  through softplus with floors μ ≥ 0.01, r ≥ 0.1 — the design doc §8
+  stability guard against NaNs. The log-pmf is implemented by hand in
+  `models/distributions.py` and unit-tested against
+  `scipy.stats.nbinom.logpmf` (≤1e-4), at x = 0 (common in M5), and shown to
+  beat Poisson in total log-likelihood on over-dispersed synthetic data.
+- **Scale convention:** the NB decoder scores **raw counts** (its ELBO is an
+  exact bound on the discrete log-likelihood — directly comparable to the
+  classical baselines' NLL in Phase 8); the encoder input remains log1p'd;
+  the Gaussian decoder keeps its log1p reconstruction space.
+- **Smoke run** (1,000 real windows, 3 epochs, 74,320 params): NB ELBO
+  finite throughout, −42.75 → −31.20 → −20.83. **KL reversal observed:**
+  under the NB decoder the KL *grows* (0.16 → 0.45 → 1.45 nats, 4/16 dims
+  active) where the Gaussian-decoder CVAE had collapsed to 0.09 — with an
+  exact count likelihood, residual per-week stochasticity is apparently
+  worth encoding in z. Early evidence, small slice; Milestone 5's
+  annealing/free-bits still get implemented as planned, with the β=1
+  no-annealing run as the documented comparison point.

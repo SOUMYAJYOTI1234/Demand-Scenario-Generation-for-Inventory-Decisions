@@ -30,6 +30,8 @@ KL_WARN_THRESHOLD = 0.1
 
 
 def make_model(config, n_items: int, n_stores: int, n_continuous: int) -> ConditionalVAE:
+    # This is the Milestone-3 (Gaussian-decoder) smoke script; the NB decoder
+    # has its own script, scripts/train_cvae_nb.py.
     return ConditionalVAE(
         horizon=config.data.horizon_weeks,
         latent_dim=config.model.latent_dim,
@@ -40,6 +42,7 @@ def make_model(config, n_items: int, n_stores: int, n_continuous: int) -> Condit
         decoder_hidden=list(config.model.decoder_hidden),
         item_embedding_dim=config.model.item_embedding_dim,
         store_embedding_dim=config.model.store_embedding_dim,
+        decoder_likelihood="gaussian",
     )
 
 

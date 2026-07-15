@@ -16,6 +16,8 @@ BATCH = 32
 
 def make_model() -> ConditionalVAE:
     torch.manual_seed(0)
+    # Milestone-3 tests exercise the conditioning wiring under the Gaussian
+    # decoder; the NB decoder has its own suite (test_nb_decoder.py).
     return ConditionalVAE(
         horizon=H,
         latent_dim=LATENT,
@@ -24,6 +26,7 @@ def make_model() -> ConditionalVAE:
         n_continuous=N_CONT,
         encoder_hidden=[128, 64],
         decoder_hidden=[64, 128],
+        decoder_likelihood="gaussian",
     )
 
 

@@ -25,7 +25,7 @@ class TestLoadDefaultConfig:
         assert config.model.latent_dim == 16  # K, within the design range 8-16
         assert config.model.encoder_hidden == [128, 64]
         assert config.model.decoder_hidden == [64, 128]
-        assert config.model.decoder == "negative_binomial"
+        assert config.model.decoder_likelihood == "nb"
         assert config.decision.protocol == "aggregate_horizon"
         assert config.data.category == "FOODS"
         assert config.training.seeds == [0, 1, 2]

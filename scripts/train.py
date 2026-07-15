@@ -23,7 +23,7 @@ def main() -> None:
     config = load_config(args.config)
     print(
         f"Loaded config: H={config.data.horizon_weeks}, K={config.model.latent_dim}, "
-        f"decoder={config.model.decoder}"
+        f"decoder={config.model.decoder_likelihood}"
     )
     raise NotImplementedError(
         "TODO(Phase 6/7): training loop — data pipeline, CVAE, ELBO optimization, "
