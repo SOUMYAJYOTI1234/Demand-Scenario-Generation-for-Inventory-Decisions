@@ -7,8 +7,11 @@ from demand_vae.models.distributions import MU_FLOOR, R_FLOOR, nb_log_likelihood
 from demand_vae.models.trivial import ConstantSampler, FixedRatePoissonSampler
 from demand_vae.models.vae import (
     UnconditionalVAE,
+    apply_free_bits,
+    collapse_warning,
     gaussian_kl,
     gaussian_kl_per_dim,
+    get_beta,
     nb_vae_loss,
     reparameterize,
     vae_loss,
@@ -24,8 +27,11 @@ __all__ = [
     "DemandAutoencoder",
     "FixedRatePoissonSampler",
     "UnconditionalVAE",
+    "apply_free_bits",
+    "collapse_warning",
     "gaussian_kl",
     "gaussian_kl_per_dim",
+    "get_beta",
     "nb_log_likelihood",
     "nb_vae_loss",
     "reconstruction_loss",

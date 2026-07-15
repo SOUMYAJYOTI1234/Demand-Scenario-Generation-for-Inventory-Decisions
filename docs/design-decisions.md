@@ -201,3 +201,26 @@ design doc §4).
   worth encoding in z. Early evidence, small slice; Milestone 5's
   annealing/free-bits still get implemented as planned, with the β=1
   no-annealing run as the documented comparison point.
+
+---
+
+## 2026-07-15 — CVAE Milestone 5: KL annealing + free bits (Phase 6.5)
+
+- **Annealing:** linear β = min(1, epoch / n_anneal_epochs) (Bowman et al.
+  2016), `n_anneal_epochs: 10` in config; `<= 0` disables (β = 1), which is
+  the Phase-9 annealing-off ablation for free.
+- **Free bits** (Kingma et al. 2016): the floor is applied to the
+  **batch-mean per-dimension KL** — `clamp(kl_per_dim, min=lambda_fb)` with
+  `lambda_fb: 0.5` nats — before the β-weighted sum. Dimensions below the
+  floor contribute a constant, so the optimizer gains nothing by collapsing
+  them. **Reported `kl` and `elbo` always use the raw (unfloored) KL** — the
+  floor shapes gradients, never the reported bound. `lambda_fb: 0`
+  reproduces the Milestone-2/4 objective exactly (unit-tested).
+- **Collapse detector:** warns iff mean per-dim KL < 0.1 nats AND β ≥ 1 —
+  low KL during the ramp is expected, not pathological.
+- Training defaults pinned: `n_epochs: 30`, `batch_size: 256`, `lr: 1e-3`.
+- **Smoke run** (1,000 real windows, 5 epochs, β 0.1 → 0.5): raw KL grows
+  0.23 → **6.53 nats** (vs 0.09 collapsed in Milestone 3), min-dim KL rising
+  every epoch (0.004 → 0.066), 7/16 dims already at/above the 0.5 floor
+  mid-ramp; no warning fired. Phase 6 model stack complete — Phase 7 trains
+  it on all 1.68M windows.

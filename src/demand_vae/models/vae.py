@@ -52,29 +52,85 @@ def gaussian_kl(mu: torch.Tensor, log_sigma_sq: torch.Tensor) -> torch.Tensor:
     return gaussian_kl_per_dim(mu, log_sigma_sq).sum(dim=-1).mean()
 
 
+# ---------------------------------------------------------------------------
+# Collapse handling — Milestone 5 (roadmap Phase 6.5)
+# ---------------------------------------------------------------------------
+
+COLLAPSE_KL_THRESHOLD = 0.1  # nats per dimension: below this the latent is ~unused
+
+
+def get_beta(epoch: int | float, n_anneal_epochs: int) -> float:
+    """Linear KL-annealing schedule: beta = min(1, epoch / n_anneal_epochs).
+
+    Ramping the KL weight from 0 lets the decoder learn to use z before the
+    prior-matching pressure arrives (Bowman et al. 2016). Clamps at 1;
+    ``n_anneal_epochs <= 0`` disables annealing (beta = 1 always).
+    """
+    if n_anneal_epochs <= 0:
+        return 1.0
+    return min(1.0, epoch / n_anneal_epochs)
+
+
+def apply_free_bits(kl_per_dim: torch.Tensor, lambda_fb: float) -> torch.Tensor:
+    """Floor each per-dimension KL at ``lambda_fb`` nats (Kingma et al. 2016).
+
+    Applied to the batch-averaged per-dimension KL: dimensions below the
+    floor contribute a constant ``lambda_fb`` to the loss and therefore
+    receive no gradient pushing them further toward the prior — the
+    optimizer can't profit from collapsing them.
+    """
+    if lambda_fb <= 0:
+        return kl_per_dim
+    return torch.clamp(kl_per_dim, min=lambda_fb)
+
+
+def collapse_warning(kl_per_dim: torch.Tensor, beta: float) -> str | None:
+    """Return a warning string iff the posterior has collapsed post-annealing.
+
+    Fires when the mean per-dimension KL is below ``COLLAPSE_KL_THRESHOLD``
+    AND annealing is complete (beta >= 1) — low KL while beta < 1 is expected,
+    not pathological. ``kl_per_dim`` is the (K,) batch-mean per-dimension KL.
+    """
+    mean_kl = float(kl_per_dim.mean())
+    if beta >= 1.0 and mean_kl < COLLAPSE_KL_THRESHOLD:
+        return (
+            f"Posterior collapse detected: mean per-dim KL = {mean_kl:.3f} nats. "
+            "Consider increasing lambda_fb."
+        )
+    return None
+
+
 def vae_loss(
     recon_log1p: torch.Tensor,
     x: torch.Tensor,
     mu: torch.Tensor,
     log_sigma_sq: torch.Tensor,
     beta: float = 1.0,
+    lambda_fb: float = 0.0,
 ) -> dict[str, torch.Tensor]:
     """ELBO-derived training loss and its monitored components.
 
     Reconstruction term: unit-variance Gaussian NLL in log1p space =
     0.5 * sum-of-squared-errors per window (additive constant dropped),
     mean over batch — summed over H so its scale is commensurate with the
-    dim-summed KL. Loss = recon + beta * KL (beta = 1 here; annealing is
-    Milestone 5). ``elbo`` = -(recon + KL), reported for comparison across
-    runs (beta-independent).
+    dim-summed KL.
+
+    Loss = recon + beta * sum(free-bits-floored per-dim KL). ``beta`` follows
+    the annealing schedule (:func:`get_beta`); ``lambda_fb`` is the free-bits
+    floor in nats (0 disables — then this reduces exactly to the Milestone-2
+    objective). Monitored ``kl`` and ``elbo`` always use the *raw* KL: the
+    floor shapes gradients, not the reported bound.
     """
     target = torch.log1p(x)
     recon = 0.5 * (recon_log1p - target).pow(2).sum(dim=-1).mean()
-    kl = gaussian_kl(mu, log_sigma_sq)
+    kl_per_dim = gaussian_kl_per_dim(mu, log_sigma_sq).mean(dim=0)  # (K,)
+    kl = kl_per_dim.sum()
+    kl_train = apply_free_bits(kl_per_dim, lambda_fb).sum()
     return {
-        "loss": recon + beta * kl,
+        "loss": recon + beta * kl_train,
         "recon": recon,
         "kl": kl,
+        "kl_floored": kl_train,
         "elbo": -(recon + kl),
     }
 
@@ -86,23 +142,28 @@ def nb_vae_loss(
     mu_z: torch.Tensor,
     log_sigma_sq: torch.Tensor,
     beta: float = 1.0,
+    lambda_fb: float = 0.0,
 ) -> dict[str, torch.Tensor]:
     """ELBO-derived loss with the Negative Binomial reconstruction term.
 
     Same structure and conventions as :func:`vae_loss` — reconstruction NLL
     summed over the H weeks, KL summed over latent dims, both batch-averaged,
-    loss = recon + beta * KL — but the observation model is the per-week NB
-    on **raw counts** (Milestone 4), so this ELBO is an exact (not
-    constant-dropped) bound on the discrete log-likelihood.
+    loss = recon + beta * free-bits-floored KL — but the observation model is
+    the per-week NB on **raw counts** (Milestone 4), so the reported ``elbo``
+    (always from the raw KL) is an exact bound on the discrete
+    log-likelihood.
     """
     from demand_vae.models.distributions import nb_log_likelihood
 
     recon = -nb_log_likelihood(x, mu, r).sum(dim=-1).mean()
-    kl = gaussian_kl(mu_z, log_sigma_sq)
+    kl_per_dim = gaussian_kl_per_dim(mu_z, log_sigma_sq).mean(dim=0)  # (K,)
+    kl = kl_per_dim.sum()
+    kl_train = apply_free_bits(kl_per_dim, lambda_fb).sum()
     return {
-        "loss": recon + beta * kl,
+        "loss": recon + beta * kl_train,
         "recon": recon,
         "kl": kl,
+        "kl_floored": kl_train,
         "elbo": -(recon + kl),
     }
 

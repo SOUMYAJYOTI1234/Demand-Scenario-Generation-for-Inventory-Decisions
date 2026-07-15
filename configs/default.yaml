@@ -34,9 +34,11 @@ model:
 
 training:
   seeds: [0, 1, 2]                # final numbers reported as mean +/- sd over 3 seeds
-  lr: 1.0e-3                      # PLACEHOLDER (Phase 7): Adam default, not yet tuned
-  batch_size: 256                 # PLACEHOLDER (Phase 7)
-  max_epochs: 200                 # PLACEHOLDER (Phase 7): early stopping on validation ELBO
+  lr: 1.0e-3                      # Adam (roadmap Phase 7: don't tune before the model is correct)
+  batch_size: 256
+  n_epochs: 30                    # default full training run length (early stopping may end sooner)
+  n_anneal_epochs: 10             # KL annealing: beta ramps 0 -> 1 linearly over the first N epochs
+  lambda_fb: 0.5                  # free-bits floor per latent dimension, in nats (0 disables)
 
 decision:
   protocol: aggregate_horizon     # primary decision task: D = sum of the H-week window (design doc §1.2)
