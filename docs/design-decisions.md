@@ -224,3 +224,31 @@ design doc §4).
   every epoch (0.004 → 0.066), 7/16 dims already at/above the 0.5 floor
   mid-ramp; no warning fired. Phase 6 model stack complete — Phase 7 trains
   it on all 1.68M windows.
+
+---
+
+## 2026-07-15 — Phase 7: full training run + CVAE sampler
+
+- **Engine in `src/demand_vae/training.py`**, `scripts/train.py` is the thin
+  CLI (roadmap Phase 3 discipline). Batching = per-epoch permutation with
+  contiguous tensor slices (equivalent to a shuffling DataLoader, several
+  times faster on CPU). Validation ELBO uses raw KL and a fixed noise seed
+  so epochs share one estimator; "best" = **highest** val ELBO (the prompt's
+  "lowest" read as a slip — ELBO is maximized).
+- **Full run** (1,681,819 train / 425,408 val windows, NB decoder, K=16,
+  batch 256, lr 1e-3, anneal 10 epochs, λ_fb=0.5, patience 5, seed 0):
+  early-stopped at epoch 18 in **9.8 min CPU** — no epoch-count reduction
+  needed. Best val ELBO **−13.4097** (epoch 13). **16/16 latent dimensions
+  active every epoch** (mean per-dim KL ~0.42, min ~0.22 nats); the
+  Milestone-3 collapse never reappeared at scale. Log:
+  results/training_log.csv; checkpoints/best.pt + last.pt (git-ignored)
+  carry model weights, optimizer state, epoch, val ELBO, full config, and
+  model constructor kwargs.
+- **`CVAESampler`** (`models/sampler.py`): the trained CVAE behind the
+  Phase 5 `sample(context, n_scenarios)` contract — z ~ N(0,I) → decode →
+  NB draw via numpy **Gamma–Poisson** (the runtime fix flagged in the
+  Phase 5 log; identical distribution, far faster than direct
+  negative_binomial), memory-capped decode chunks, integer ≥ 0 outputs.
+  Verified from checkpoint on real test contexts.
+- Phase 8 next: the trained sampler enters the two-level harness against
+  the four baselines (S=1000, 3 ratios, 3 seeds, paired bootstrap).
