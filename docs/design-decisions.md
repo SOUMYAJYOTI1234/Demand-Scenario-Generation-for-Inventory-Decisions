@@ -252,3 +252,42 @@ design doc §4).
   Verified from checkpoint on real test contexts.
 - Phase 8 next: the trained sampler enters the two-level harness against
   the four baselines (S=1000, 3 ratios, 3 seeds, paired bootstrap).
+
+---
+
+## 2026-07-17 — Phase 8: full two-level evaluation (RQ0 answered)
+
+- **Protocol:** 5 models × 3 pre-registered ratios × 3 seeds on all 651,406
+  test windows, S=1000; baseline seed-0 reused from the Phase 5 table (no
+  rerun); paired bootstrap (10⁴ resamples) pairs on windows at **seed 1** —
+  the seed where every model has per-window costs (Phase 5 stored none).
+  Per-run artifacts in results/full_eval/ (JSONs committed, npz ignored).
+- **RQ0 — the CVAE wins at every ratio, decisively.** Mean realized cost
+  (seed mean; sd ≤ 0.01 everywhere, so S=1000 SAA noise is negligible):
+  1:1 → **18.14** vs NB 29.17 (−38%); 3:1 → **34.35** vs Gaussian 50.97
+  (−33%); 1:3 → **26.30** vs empirical 45.15 (−42%). Every paired bootstrap
+  CI vs every baseline excludes zero by a wide margin (e.g. 1:1 vs NB:
+  −11.02, CI [−11.15, −10.90], p_gt_zero = 0). This clears the "excellent
+  success" bar (beats the pivotal fitted-NB, all ratios, not just 1).
+- **Why (the mechanism, Level 1):** the CVAE is simultaneously sharper AND
+  calibrated — CRPS 13.64 vs 21.9–26.6; 90% coverage 0.890 (baselines
+  0.37–0.79); near-flat PIT (bins ~1.03–1.12 vs Gaussian's 3.19/0.51/2.15
+  U-shape); service level 0.765 at τ=0.75, 0.535 at τ=0.5 — closest to
+  nominal everywhere. Conditioning on demand lags gives per-window
+  conditional distributions; the per-series unconditional baselines must
+  spread over each series' whole marginal history.
+- **RQ4:** aggregate-horizon 18.14 vs repeated-marginal 22.87 at 1:1 for
+  the same trained model/draws — the joint-consuming protocol is ~21%
+  cheaper (protocols differ structurally; the within-model gap is the
+  pre-registered signal that within-window structure matters).
+- **RQ3:** Spearman(CRPS rank, cost rank) = +0.30 (3:1), +0.50 (1:1),
+  +1.00 (1:3). The CVAE ranks first on both metrics at every ratio; the
+  disagreement is among baselines (at 3:1, cost prefers Gaussian while CRPS
+  prefers empirical) — the pre-registered statistical-vs-decision
+  divergence, to be discussed via quantile regions in the report.
+- **Caveats to carry into the report:** censoring (A1) means absolute
+  service levels are optimistic for all models equally; the CVAE margin is
+  large because baselines are per-series *unconditional* by design (RQ1's
+  framing) — the honest headline is "conditioning + count likelihood +
+  joint sampling beat well-fitted unconditional classical models," not
+  "deep beats shallow."

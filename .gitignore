@@ -47,3 +47,5 @@ htmlcov/
 Thumbs.db
 .vscode/
 .idea/
+results/full_eval/*.npz
+results/full_eval/logs/

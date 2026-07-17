@@ -214,6 +214,10 @@ class NegativeBinomialSampler(_PerSeriesSampler):
         self._require_fitted()
         rows = self._rows(context_batch)
         size = (rows.size, n_scenarios, self.horizon)
-        r = self.r_[rows, None, None]
-        p = self.p_[rows, None, None]
-        return self._rng.negative_binomial(r, p, size).astype(float)
+        # NB drawn via its Gamma-Poisson mixture: identical distribution to
+        # rng.negative_binomial(r, p) but ~2x faster at Phase 8 scale (the
+        # runtime fix pre-registered in the Phase 5 design log). mu = r(1-p)/p.
+        r = np.broadcast_to(self.r_[rows, None, None], size)
+        mu = np.broadcast_to((self.r_ * (1.0 - self.p_) / self.p_)[rows, None, None], size)
+        rate = self._rng.gamma(shape=r, scale=np.divide(mu, r, where=r > 0, out=np.zeros(size)))
+        return self._rng.poisson(rate).astype(float)

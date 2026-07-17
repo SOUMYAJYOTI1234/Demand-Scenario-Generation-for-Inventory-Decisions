@@ -1,0 +1,51 @@
+{
+ "model": "negative_binomial",
+ "seed": 2,
+ "commit": "fe80a7b",
+ "n_windows": 651406,
+ "n_scenarios": 1000,
+ "level1": {
+  "crps": 22.661280860398897,
+  "coverage_50": 0.31332072470932104,
+  "coverage_90": 0.6233086585017639
+ },
+ "level2": [
+  {
+   "c_u": 3,
+   "c_o": 1,
+   "mean_realized_cost": 51.20050935975413,
+   "service_level": 0.6889282567246848,
+   "fill_rate": 0.8405011366883381,
+   "mean_overstock": 25.74494708369281
+  },
+  {
+   "c_u": 1,
+   "c_o": 1,
+   "mean_realized_cost": 29.16618360899347,
+   "service_level": 0.5460189190765821,
+   "fill_rate": 0.7583837943003583,
+   "mean_overstock": 16.312431878122094
+  },
+  {
+   "c_u": 1,
+   "c_o": 3,
+   "mean_realized_cost": 48.30399474367752,
+   "service_level": 0.4055335689262918,
+   "fill_rate": 0.6575840581184756,
+   "mean_overstock": 10.029264391178467
+  }
+ ],
+ "pit_hist": [
+  185395,
+  48073,
+  40235,
+  36997,
+  36058,
+  36304,
+  38362,
+  41744,
+  50819,
+  137419
+ ],
+ "seconds": 1262.9
+}

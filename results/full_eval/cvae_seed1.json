@@ -1,0 +1,77 @@
+{
+ "model": "cvae",
+ "seed": 1,
+ "commit": "fe80a7b",
+ "n_windows": 651406,
+ "n_scenarios": 1000,
+ "level1": {
+  "crps": 13.642726101945648,
+  "coverage_50": 0.5699026413634507,
+  "coverage_90": 0.8897400392382017
+ },
+ "level2": [
+  {
+   "c_u": 3,
+   "c_o": 1,
+   "mean_realized_cost": 34.354064899617136,
+   "service_level": 0.7651449326533682,
+   "fill_rate": 0.8749162943642755,
+   "mean_overstock": 14.391063330703124
+  },
+  {
+   "c_u": 1,
+   "c_o": 1,
+   "mean_realized_cost": 18.14237510861122,
+   "service_level": 0.5351654728387518,
+   "fill_rate": 0.7700892515759572,
+   "mean_overstock": 5.911342542131942
+  },
+  {
+   "c_u": 1,
+   "c_o": 3,
+   "mean_realized_cost": 26.301002754042795,
+   "service_level": 0.30385504585465895,
+   "fill_rate": 0.6314474693354435,
+   "mean_overstock": 2.2314531950887773
+  }
+ ],
+ "pit_hist": [
+  67098,
+  61319,
+  65556,
+  67865,
+  68573,
+  66589,
+  63903,
+  60425,
+  57369,
+  72709
+ ],
+ "seconds": 2671.8,
+ "level2_marginal": [
+  {
+   "c_u": 3,
+   "c_o": 1,
+   "mean_realized_cost": 42.890268127711444,
+   "service_level": 0.7946480382434303,
+   "fill_rate": 0.8545606535523653,
+   "mean_overstock": 19.67856452043733
+  },
+  {
+   "c_u": 1,
+   "c_o": 1,
+   "mean_realized_cost": 22.87449301971428,
+   "service_level": 0.5515511831330998,
+   "fill_rate": 0.7035455291999713,
+   "mean_overstock": 7.103397880891487
+  },
+  {
+   "c_u": 1,
+   "c_o": 3,
+   "mean_realized_cost": 33.256826004058915,
+   "service_level": 0.32084138003027296,
+   "fill_rate": 0.500292720837297,
+   "mean_overstock": 2.224291762740902
+  }
+ ]
+}

@@ -117,6 +117,8 @@ def evaluate_two_level(
     config: Config,
     pit_seed: int = 0,
     chunk_size: int = 4096,
+    protocols: tuple[str, ...] = ("aggregate",),
+    collect_per_window: bool = False,
 ) -> dict:
     """Full two-level evaluation of one sampler on one split.
 
@@ -125,14 +127,30 @@ def evaluate_two_level(
     newsvendor at every pre-registered cost ratio and score the realized
     decisions against the actual totals (Level 2). Streaming: O(chunk) memory.
 
+    ``protocols``: "aggregate" (primary, design doc §1.2 option 3) is always
+    required; adding "marginal" also runs the RQ4 secondary protocol — H
+    separate weekly newsvendor decisions from each week's marginal scenario
+    distribution, using the *same* scenario draws (per-window cost = sum of
+    the H weekly costs; service level counted per week-decision).
+
+    ``collect_per_window=True`` additionally returns the aggregate-protocol
+    per-window realized costs per ratio — the pairing unit for the Phase 8
+    paired bootstrap.
+
     Returns a dict with ``n_windows``, ``level1`` (mean CRPS, coverage at 50%
-    and 90%), ``pit`` (per-window randomized PIT values, for histograms), and
-    ``level2`` — one dict per cost ratio with mean_realized_cost,
-    service_level, fill_rate, mean_overstock.
+    and 90%), ``pit`` (per-window randomized PIT values, for histograms),
+    ``level2`` (aggregate protocol; one dict per cost ratio with
+    mean_realized_cost, service_level, fill_rate, mean_overstock), plus
+    optional ``level2_marginal`` and ``per_window_cost``.
     """
+    unknown = set(protocols) - {"aggregate", "marginal"}
+    if unknown or "aggregate" not in protocols:
+        raise ValueError(f"protocols must include 'aggregate' (got {protocols})")
+    run_marginal = "marginal" in protocols
     n_scenarios = config.decision.n_scenarios
     ratios = [tuple(r) for r in config.decision.cost_ratios]
     n_windows = len(split)
+    horizon = split.x.shape[1]
     pit_rng = np.random.default_rng(pit_seed)
 
     crps_sum = 0.0
@@ -141,6 +159,14 @@ def evaluate_two_level(
     acc = {
         ratio: {"cost": 0.0, "stockouts": 0.0, "overstock": 0.0, "served": 0.0} for ratio in ratios
     }
+    acc_marginal = {
+        ratio: {"cost": 0.0, "stockouts": 0.0, "overstock": 0.0, "served": 0.0} for ratio in ratios
+    }
+    per_window_cost = (
+        {ratio: np.empty(n_windows, dtype=np.float32) for ratio in ratios}
+        if collect_per_window
+        else None
+    )
     total_demand = 0.0
 
     for start in range(0, n_windows, chunk_size):
@@ -149,6 +175,7 @@ def evaluate_two_level(
         scenarios = sampler.sample_batch(batch, n_scenarios)  # (n, S, H)
         totals = scenarios.sum(axis=2)  # (n, S)
         actual = split.x[start:stop].sum(axis=1).astype(float)  # (n,)
+        actual_weekly = split.x[start:stop].astype(float)  # (n, H)
 
         crps_sum += crps_from_samples(totals, actual).sum()
         pit_values[start:stop] = pit_from_samples(totals, actual, pit_rng)
@@ -161,24 +188,41 @@ def evaluate_two_level(
             order = solve_newsvendor_saa_batch(totals, c_u, c_o)
             under = np.maximum(actual - order, 0.0)
             over = np.maximum(order - actual, 0.0)
+            cost = c_u * under + c_o * over
             a = acc[(c_u, c_o)]
-            a["cost"] += (c_u * under + c_o * over).sum()
+            a["cost"] += cost.sum()
             a["stockouts"] += (actual > order).sum()
             a["overstock"] += over.sum()
             a["served"] += np.minimum(order, actual).sum()
+            if per_window_cost is not None:
+                per_window_cost[(c_u, c_o)][start:stop] = cost
 
-    level2 = [
-        {
-            "c_u": c_u,
-            "c_o": c_o,
-            "mean_realized_cost": acc[(c_u, c_o)]["cost"] / n_windows,
-            "service_level": 1.0 - acc[(c_u, c_o)]["stockouts"] / n_windows,
-            "fill_rate": acc[(c_u, c_o)]["served"] / max(total_demand, 1.0),
-            "mean_overstock": acc[(c_u, c_o)]["overstock"] / n_windows,
-        }
-        for c_u, c_o in ratios
-    ]
-    return {
+            if run_marginal:
+                tau = c_u / (c_u + c_o)
+                weekly_orders = np.quantile(scenarios, tau, axis=1, method="inverted_cdf")  # (n, H)
+                w_under = np.maximum(actual_weekly - weekly_orders, 0.0)
+                w_over = np.maximum(weekly_orders - actual_weekly, 0.0)
+                m = acc_marginal[(c_u, c_o)]
+                m["cost"] += (c_u * w_under + c_o * w_over).sum()
+                m["stockouts"] += (actual_weekly > weekly_orders).sum()
+                m["overstock"] += w_over.sum()
+                m["served"] += np.minimum(weekly_orders, actual_weekly).sum()
+
+    def level2_rows(bucket: dict, decisions_per_window: int) -> list[dict]:
+        return [
+            {
+                "c_u": c_u,
+                "c_o": c_o,
+                "mean_realized_cost": bucket[(c_u, c_o)]["cost"] / n_windows,
+                "service_level": 1.0
+                - bucket[(c_u, c_o)]["stockouts"] / (n_windows * decisions_per_window),
+                "fill_rate": bucket[(c_u, c_o)]["served"] / max(total_demand, 1.0),
+                "mean_overstock": bucket[(c_u, c_o)]["overstock"] / n_windows,
+            }
+            for c_u, c_o in ratios
+        ]
+
+    result = {
         "n_windows": n_windows,
         "n_scenarios": n_scenarios,
         "level1": {
@@ -189,8 +233,63 @@ def evaluate_two_level(
             },
         },
         "pit": pit_values,
-        "level2": level2,
+        "level2": level2_rows(acc, 1),
     }
+    if run_marginal:
+        result["level2_marginal"] = level2_rows(acc_marginal, horizon)
+    if per_window_cost is not None:
+        result["per_window_cost"] = {
+            f"{c_u}:{c_o}": per_window_cost[(c_u, c_o)] for c_u, c_o in ratios
+        }
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Phase 8 statistics: paired bootstrap and rank agreement
+# ---------------------------------------------------------------------------
+
+
+def paired_bootstrap_ci(
+    cost_a: np.ndarray,
+    cost_b: np.ndarray,
+    n_boot: int = 10_000,
+    seed: int = 0,
+    batch: int = 20,
+) -> dict[str, float]:
+    """Paired bootstrap on the mean cost difference (a - b), pairing on windows.
+
+    Pairing removes the between-window demand variance that dwarfs
+    between-method differences (design doc §7). Returns the observed mean
+    difference, the 95% percentile CI over ``n_boot`` resamples, and
+    ``p_gt_zero`` — the fraction of bootstrap means > 0 (the design's
+    pre-registered one-sided summary; a negative mean difference with
+    ``p_gt_zero`` near 0 means model a is cheaper).
+    """
+    diff = np.asarray(cost_a, dtype=np.float64) - np.asarray(cost_b, dtype=np.float64)
+    if diff.shape != np.asarray(cost_b).shape or diff.ndim != 1:
+        raise ValueError("cost_a and cost_b must be 1-D arrays of equal length (paired)")
+    n = diff.size
+    rng = np.random.default_rng(seed)
+    means = np.empty(n_boot, dtype=np.float64)
+    for start in range(0, n_boot, batch):
+        stop = min(start + batch, n_boot)
+        idx = rng.integers(0, n, size=(stop - start, n))
+        means[start:stop] = diff[idx].mean(axis=1)
+    lo, hi = np.quantile(means, [0.025, 0.975])
+    return {
+        "mean_diff": float(diff.mean()),
+        "ci_lower": float(lo),
+        "ci_upper": float(hi),
+        "p_gt_zero": float((means > 0).mean()),
+    }
+
+
+def spearman_rank_correlation(a, b) -> float:
+    """Spearman rank correlation between two metric vectors (RQ3 helper)."""
+    from scipy import stats
+
+    rho = stats.spearmanr(np.asarray(a, dtype=float), np.asarray(b, dtype=float)).statistic
+    return float(rho)
 
 
 # ---------------------------------------------------------------------------
