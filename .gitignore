@@ -49,3 +49,4 @@ Thumbs.db
 .idea/
 results/full_eval/*.npz
 results/full_eval/logs/
+results/ablations/logs/

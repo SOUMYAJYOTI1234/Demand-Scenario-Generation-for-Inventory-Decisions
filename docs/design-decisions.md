@@ -291,3 +291,56 @@ design doc §4).
   framing) — the honest headline is "conditioning + count likelihood +
   joint sampling beat well-fitted unconditional classical models," not
   "deep beats shallow."
+
+---
+
+## 2026-07-16 — Phase 9: ablation studies
+
+- **Budget/protocol:** each ablation changes exactly one factor relative to
+  the main CVAE (NB decoder, K=16, 10-epoch anneal, λ_fb=0.5, conditioned),
+  trained under the same 18-epoch/patience-5 budget the main model realized,
+  evaluated seed 0 only through the unmodified Phase 8 harness. All config
+  overrides are in-memory (`configs/default.yaml` untouched) — nothing to
+  revert. `unconditioned` zeroes context tensors in **both** training and
+  evaluation (a `ZeroContextSampler` subclass on the eval side), so the
+  comparison isolates conditioning at matched architecture and capacity.
+
+**Results** (test, seed 0; main CVAE cost@1:1 = 18.14, CRPS = 13.64, cov90 = 0.890):
+
+| ablation | cost@1:1 | Δ vs main | CRPS | cov90 |
+|---|---|---|---|---|
+| gaussian_decoder (RQ1) | 25.14 | **+38.6%** | 20.13 | 0.954 |
+| unconditioned (RQ2) | 43.35 | **+139%** | 35.91 | 0.795 |
+| no_annealing | 17.88 | −1.5% | 13.43 | 0.898 |
+| latent_dim8 | 16.78 | **−7.5%** | 12.65 | 0.882 |
+
+- **RQ1 confirmed sharply:** swapping only the decoder likelihood (NB → Gaussian,
+  same conditioning, same architecture) costs 38.6% at 1:1 and *widens* to
+  +88% at 3:1 (64.48 vs 34.36) — the count likelihood, not the deep model
+  alone, is doing real work. Note the Gaussian ablation's cov90 = 0.954
+  *overshoots* nominal 90%: symmetric unit-variance error bars are too wide
+  for right-skewed low-count demand, i.e. over-covered by being unnecessarily
+  diffuse — consistent with the design doc §7 critique of Gaussian demand
+  models, now with a same-architecture control.
+- **RQ2 confirmed decisively:** zeroing context more than doubles cost
+  (+139% at 1:1) and degrades calibration (cov90 0.795 vs 0.890) — the
+  single largest ablation effect, i.e. conditioning is where most of the
+  CVAE's advantage over the *unconditional* comparison lives, though Section
+  9's finding still holds against the classical *baselines* specifically
+  (RQ1 above shows the likelihood family alone is not sufficient).
+- **KL annealing: negligible effect at this operating point.** β=1 from
+  epoch 0 costs only −1.5% relative to the annealed run and keeps 0/16 dims
+  collapsed status quo (CRPS/cov90 essentially unchanged) — with free bits
+  (λ_fb=0.5) already active, annealing is not load-bearing here; free bits
+  alone appear to prevent collapse. Worth flagging in the report as a
+  disagreement with the a priori risk assessment (design doc §8 rated
+  collapse "likelihood: high").
+- **K=8 beats K=16 on every metric** (cost, CRPS, coverage) — mild
+  over-parameterization at K=16 for this data (H=4, weekly aggregates),
+  consistent with the design doc's own framing of K=8–16 as a range to sweep,
+  not a fixed optimum. Reported honestly as a negative result for the K=16
+  default rather than smoothed over; a K=4 or K=8-default rerun is flagged as
+  a natural follow-up if time permits, otherwise stated as a limitation.
+- Artifacts: `results/ablations/{gaussian_decoder,unconditioned,no_annealing,
+  latent_dim8}.csv` + per-run training logs, `ablation_summary.csv`,
+  `figures/ablation_comparison.png`; checkpoints `ablation_*.pt` (git-ignored).

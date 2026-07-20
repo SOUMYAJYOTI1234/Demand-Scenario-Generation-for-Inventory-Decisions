@@ -1,0 +1,6 @@
+model,cost_3_1,cost_1_1,cost_1_3,crps,coverage_90
+"cvae_main (NB, K=16, annealed, conditioned)",34.3564,18.1401,26.3065,13.6422,0.8898
+cvae_gaussian_decoder,64.4811,25.1422,25.1464,20.1271,0.954
+cvae_unconditioned,105.1452,43.3472,50.5437,35.9121,0.7952
+cvae_no_annealing,33.7371,17.8755,25.9933,13.4336,0.8979
+cvae_latent_dim8,31.6374,16.7832,24.5901,12.6537,0.8822
